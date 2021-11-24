@@ -3,6 +3,8 @@ from pathlib import Path
 
 
 class Config:
+    """Handling config.ini in a less messy way"""
+
     def __init__(self, configPath: Path) -> None:
         self.__config = configparser.ConfigParser()
         self.__config.read(configPath.absolute().__str__())

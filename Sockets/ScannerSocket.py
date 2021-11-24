@@ -1,4 +1,5 @@
 import json
+from typing import Union
 
 import tornado.websocket
 
@@ -10,9 +11,12 @@ from Utlis import getScannerSocketMessageTypeAction
 
 class ScannerSocket(tornado.websocket.WebSocketHandler):
 
-    _is_busy = False
-    # _authenticated = False
+    # Variables
+    _is_busy: bool = False
+    _node_id: Union[str, None] = None
+    _authenticated: bool = False
 
+    # is_busy is used to prevent the node from getting new tasks
     @property
     def isBusy(self) -> bool:
         return self._is_busy
@@ -20,18 +24,49 @@ class ScannerSocket(tornado.websocket.WebSocketHandler):
     @isBusy.setter
     def isBusy(self, newValue: bool) -> None:
         self._is_busy = newValue
+        self.__DB.updateScannerNode(self.nodeID, "status.is_busy", newValue)
 
     @isBusy.getter
     def isBusy(self) -> bool:
         return self._is_busy
 
+    # Node ID property
+    @property
+    def nodeID(self) -> str:
+        return self._node_id
+
+    @nodeID.setter
+    def nodeID(self, newValue: str) -> None:
+        self._node_id = newValue
+
+    @nodeID.getter
+    def nodeID(self) -> str:
+        return self._node_id
+
+    # Authenticated propety
+    @property
+    def authenticated(self) -> bool:
+        return self._authenticated
+
+    @authenticated.setter
+    def authenticated(self, newValue: bool) -> None:
+        self._authenticated = newValue
+
+    @authenticated.getter
+    def authenticated(self) -> bool:
+        return self._authenticated
+
+    # Initializing
     def initialize(self, db: DB):
         self.__DB = db
 
+    # Socket opener
     def open(self, *args, **kwargs):
         self.set_nodelay(True)
-        ScannerProcessing.add_lws(self)
+        ScannerProcessing.set_node_id(self)
+        ScannerProcessing.add_lws(self, self.__DB)
 
+    # Message switching
     def on_message(self, message: str):
         try:
             message = json.loads(message)
@@ -49,7 +84,11 @@ class ScannerSocket(tornado.websocket.WebSocketHandler):
                     },
                 }
                 self.write_message(str(mapping))
-            # TODO: message processing - should the action switching done here or in the processing?
+            if actionType == ScannerSocketMessageTypes.AUTHENTICATE_REQUEST:
+                # {"action":"AUTHENTICATE_REQUEST","result":None,"error":{"fr":False,"msg":None},"node_id":"1",auth_key:"ligma"}
+                ScannerProcessing.authenticate_request(self,
+                                                       message["auth_key"],
+                                                       self.__DB)
         except json.JSONDecodeError:
             mapping = {
                 "action": ScannerSocketMessageTypes.JSON_ERROR.value,
@@ -88,7 +127,7 @@ class ScannerSocket(tornado.websocket.WebSocketHandler):
             self.close()
 
     def on_close(self):
-        pass
+        self.__DB.removeScannerNode(self.nodeID)
 
     def send_message(self, message):
         self.write_message(message)

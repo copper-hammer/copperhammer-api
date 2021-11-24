@@ -1,5 +1,4 @@
 from pathlib import Path
-from re import I, S
 
 import tornado.ioloop
 import tornado.web
@@ -22,8 +21,10 @@ db = DB(
 
 def mapp():
     urls = [
-        (r"/status", StatusServer),
-        (r"/scanner/ws", ScannerSocket, {
+        ("/status", StatusServer, {
+            "db": db
+        }),
+        ("/scanner/ws", ScannerSocket, {
             "db": db
         }),
     ]
