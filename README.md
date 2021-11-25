@@ -5,18 +5,8 @@
 
 *An extensive API for communicating with CoppenHammer workers and scanners*
 
-## Communication
+## Communication & Models
 
-### Scanner Node
+### Authorization and Registration
 
-![Example of the perfect communication between the server and the node](https://cdn.vapronva.pw/linkedsources/copperhammer/api-github-rep/images/mainserverandscannernodecommunicationschemechapitransparent.png)
-
-### Worker Node
-
-### Database
-
-
-## Post-processing
-
-
-## Server Updates
+Node sends HTTP request to `/{type}/node_register` with its key in the `X-API-Key` header. If the authorization was successful, the server will send an answer containing `nodeID` (conforming to *UUID4*) and a token (128 bits). Since now, the node is expected to connect to `/{type}/node/{nodeID}` via WebSocket with a `token` URL-parameter containing the token.

@@ -1,69 +1,78 @@
-from typing import Union
-
 import pymongo
 
-from Types import APIKeyTypes
+from typesa import APIKeysTypes
 
 
 class DB:
-    """Main way of commnuication with MongoDB. Handles everything related to storing state, keys, etc"""
+    """Manages communication with the MongoDB."""
 
-    def __init__(
-        self,
-        host: str,
-        port: int,
-        username: str,
-        password: str,
-        authSource: str = "admin",
-        authMech: str = "SCRAM-SHA-256",
-    ) -> None:
-        client = pymongo.MongoClient(
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            authSource=authSource,
-            authMechanism=authMech,
-        )
-        self._clkap = client["cprhmr"]["apikeys"]
-        self._clsnd = client["cprhmr"]["scanernodes"]
-        self._clsrv = client["cprhmr"]["servers"]
-        self._clresu = client["cprhmr"]["results"]
+    def __init__(self, mogusURI: str, dbName: str) -> None:
+        """Initializes the DB object."""
+        client = pymongo.MongoClient(mogusURI)
+        self.__apikeys = client[dbName]["apikeys"]
+        self.__scannernodes = client[dbName]["scannernodes"]
 
-    def addApiKey(self, apiKey: str, typeKey: APIKeyTypes) -> None:
-        mapping = {"key": apiKey, "type": typeKey.value}
-        self._clkap.insert_one(mapping)
+    def checkKey(self, apiKey: str, keyType: APIKeysTypes) -> bool:
+        """
+        Checks if the API key is in the database.
 
-    def checkApiKey(self, apiKey: str, typeKey: APIKeyTypes) -> bool:
-        return self._clkap.find_one({
+        Returns True if the key is in the database, False otherwise.
+        """
+        return (self.__apikeys.find_one({
             "key": apiKey,
-            "type": typeKey.value
-        }) is not None
+            "type": keyType.value
+        }) is not None)
 
-    def addScannerNode(self, scannerNodeID: str, ipStr: str) -> None:
-        mapping = {
-            "uuid": scannerNodeID,
+    def addScannerNode(self, nodeID: str, nodeToken: str,
+                       connectedIP: str) -> None:
+        """
+        Adds a new scanner node to the database.
+
+        Node is a dictionary with the following structure:
+        ```json
+        {
+            "nodeID": "UUID",
+            "token": "TOKEN",
             "info": {
-                "request_from_ip": ipStr,
+                "connectedFrom": "IP",
+                "status": {
+                    "hasConnectedToSocket": false,
+                    "isBusy": false,
+                },
                 "stats": {
-                    "batches_sent": 0,
-                    "batches_processed": 0
+                    "batchesSent": 0,
+                    "batchesReceived": 0,
+                    "serversFound": 0
+                }
+            }
+        }
+        ```
+        """
+        mapping = {
+            "nodeID": nodeID,
+            "token": nodeToken,
+            "info": {
+                "connectedFrom": connectedIP,
+                "status": {
+                    "hasConnectedToSocket": False,
+                    "isBusy": False,
+                },
+                "stats": {
+                    "batchesSent": 0,
+                    "batchesReceived": 0,
+                    "serversFound": 0
                 },
             },
-            "status": {
-                "is_busy": False,
-                "authenticated": False,
-                "currently_processing": None,
-            },
         }
-        self._clsnd.insert_one(mapping)
+        self.__scannernodes.insert_one(mapping)
 
-    def updateScannerNode(self, scanneNodeID: str, updateParameter: str,
-                          newValue: Union[str, None, int]) -> None:
-        self._clsnd.update_one({"uuid": scanneNodeID},
-                               {"$set": {
-                                   updateParameter: newValue
-                               }})
+    def checkScannerNodeToken(self, nodeID: str, nodeToken: str) -> bool:
+        """
+        Checks if the node token is in the database.
 
-    def removeScannerNode(self, scannerNodeID: str) -> None:
-        self._clsnd.delete_one({"uuid": scannerNodeID})
+        Returns True if the token is in the database, False otherwise.
+        """
+        return (self.__scannernodes.find_one({
+            "nodeID": nodeID,
+            "token": nodeToken
+        }) is not None)

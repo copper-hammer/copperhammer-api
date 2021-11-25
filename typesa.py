@@ -1,0 +1,48 @@
+from enum import Enum
+
+
+class EnvironmentVariablesTypes(Enum):
+    """
+    Environment variables types (used to access the DB, the API, etc.)
+    """
+
+    # Main
+    MASTER_KEY = "MASTER_KEY"
+    WEBSERVER_PORT = "WEBSERVER_PORT"
+    # DB
+    MONGODB_HOST = "MONGODB_HOST"
+    MONGODB_PORT = "MONGODB_PORT"
+    MONGODB_USERNAME = "MONGODB_USERNAME"
+    MONGODB_PASSWORD = "MONGODB_PASSWORD"
+    MONGODB_DB_NAME = "MONGODB_DB_NAME"
+    MONGODB_AUTH_DB = "MONGODB_AUTH_DB"
+
+
+class APIKeysTypes(Enum):
+    """
+    List of possible API key types
+    (used to simplify the process of checking and storing)
+    """
+
+    SCANNER_NODE_REGISTRATION = "SCANNER_NODE_REGISTRATION"
+
+
+class ScanerMessageActionTypes(Enum):
+    """
+    List of possible actions for the scanner message
+    """
+
+    AUTHENTICATE_REQUEST = "AUTHENTICATE_REQUEST"
+    AUTHENTICATE_ACCEPT = "AUTHENTICATE_ACCEPT"
+    AUTHENTICATE_REJECT = "AUTHENTICATE_REJECT"
+    TOKEN_REJECT = "TOKEN_REJECT"
+    YAGOOD_NODE = "YAGOOD_NODE"
+    SEND_BATCH = "SEND_BATCH"
+    BATCH_ACCEPT_CONFIRM = "BATCH_ACCEPT_CONFIRM"
+    SUBMIT_RESULTS = "SUBMIT_RESULTS"
+    RESULTS_ACCEPT_CONFIRM = "RESULTS_ACCEPT_CONFIRM"
+    RESULTS_REJECT = "RESULTS_REJECT"
+    OVERALL_ERROR = "OVERALL_ERROR"
+    NOTENOUGHARGS_ERROR = "NOTENOUGHARGS_ERROR"
+    UNKNOWN_ACTION_RECEIVED = "UNKNOWN_ACTION_RECEIVED"
+    UNSUPPORTED_ACTION_RECEIVED = "UNSUPPORTED_ACTION_RECEIVED"
