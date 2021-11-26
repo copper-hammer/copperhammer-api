@@ -1,4 +1,5 @@
 import json
+from json.decoder import JSONDecodeError
 from typing import Union
 
 import starlette.websockets
@@ -10,8 +11,9 @@ from config import Config, checkEnvironment
 from db import DB
 from exceptions import ErrorCustomBruhher
 from models import ScannerNodeRegistration
+from processings import ScannerNodeProcessing
 from typesa import APIKeysTypes, ScanerMessageActionTypes
-from utils import generateNewToken, generateUUID
+from utils import generateNewToken, generateUUID, getActionTypeFromString
 
 checkEnvironment()
 
@@ -50,8 +52,7 @@ def validation_error_custom(request: Request, exc: RequestValidationError):
                 "fr":
                 True,
                 "msg":
-                "RVER - Not enough arguments or the \
-structure were encountered in the body",
+                "RVER - Not enough arguments or the structure were encountered in the body",
             },
         },
     )
@@ -114,13 +115,60 @@ def post_scanner_node_register8(request: Request,
 
 
 @app.websocket("/scanner/node/{nodeID}")
-async def websocket_endpoint(websocket: WebSocket, nodeID: str, token: str):
+async def websocket_endpoint_scanner_node(websocket: WebSocket, nodeID: str,
+                                          token: str):
     """Handles websocket messaging for the scanner node."""
     try:
-        if db.checkScannerNodeToken(nodeID=nodeID, nodeToken=token):
-            await websocket.accept()
-            while True:
-                await websocket.receive_text()
+        if db.checkScannerNodeToken(
+                nodeID=nodeID, nodeToken=token
+        ) and not (db.getScannerNodeParameter(
+                nodeID=nodeID,
+                parameterString="info.status.hasConnectedToSocket") is True):
+            try:
+                await websocket.accept()
+                SCNOPR = ScannerNodeProcessing(db,
+                                               nodeID=nodeID,
+                                               websocket=websocket)
+                while True:
+                    data = await websocket.receive_text()
+                    try:
+                        data = json.loads(data)
+                        await SCNOPR.processMessage(
+                            message=data,
+                            actionType=getActionTypeFromString(data["action"]),
+                        )
+                    except JSONDecodeError:
+                        mapping = {
+                            "action":
+                            ScanerMessageActionTypes.MALFORMED_MESSAGE.value,
+                            "result": None,
+                            "error": {
+                                "fr":
+                                True,
+                                "msg":
+                                "MALMJS - Received message is not a valid json",
+                            },
+                        }
+                        await websocket.send_json(mapping)
+                        await SCNOPR.gracefullyDisconnect(1002)
+                    except KeyError:
+                        mapping = {
+                            "action":
+                            ScanerMessageActionTypes.NOTENOUGHARGS_ERROR.value,
+                            "result":
+                            None,
+                            "error": {
+                                "fr":
+                                True,
+                                "msg":
+                                "NOEARE - In the received json some field were not found",
+                            },
+                        }
+                        await websocket.send_json(mapping)
+                        await SCNOPR.gracefullyDisconnect(1002)
+            except starlette.websockets.WebSocketDisconnect:
+                await SCNOPR.gracefullyDisconnect(1000,
+                                                  clientSideDisconnect=True)
         mapping = {
             "action": ScanerMessageActionTypes.TOKEN_REJECT.value,
             "result": None,
@@ -128,11 +176,14 @@ async def websocket_endpoint(websocket: WebSocket, nodeID: str, token: str):
                 "fr":
                 True,
                 "msg":
-                "TOREJ - Token was either reject or does not belong to this node",
+                "TOREJ - Token was either rejected, does not belong to this node or this node is already connected",
             },
         }
         await websocket.accept()
-        await websocket.send_text(str(json.dumps(mapping)))
-        await websocket.close()
+        await websocket.send_json(mapping)
+        await websocket.close(code=1008)
     except starlette.websockets.WebSocketDisconnect:
-        print("Disconnected")
+        pass
+    # TODO: Need to understand why sometimes `AssertionError` can be raised by `starlette` when closing websocket (server-side).
+    except AssertionError:
+        pass

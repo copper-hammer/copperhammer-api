@@ -9,8 +9,7 @@ load_dotenv()
 
 
 def checkEnvironment() -> None:
-    """Checks if there are needed environment variables \
-according to the `typesa.EnvironmentVariablesTypes`."""
+    """Checks if there are needed environment variables according to the `typesa.EnvironmentVariablesTypes`."""
     try:
         for value in EnvironmentVariablesTypes.__members__.values():
             _ = os.environ[value.name]
