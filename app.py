@@ -26,7 +26,11 @@ app = FastAPI(debug=True,
 
 @app.exception_handler(ErrorCustomBruhher)
 def custom_error_bruhher(request: Request, exc: ErrorCustomBruhher):
-    """Handles the response for the Custom error."""
+    """
+    Handles the response for the Custom error.
+
+    Returns JSONResponse with the error message.
+    """
     return JSONResponse(
         status_code=exc.statusCode,
         content={
@@ -42,7 +46,11 @@ def custom_error_bruhher(request: Request, exc: ErrorCustomBruhher):
 
 @app.exception_handler(RequestValidationError)
 def validation_error_custom(request: Request, exc: RequestValidationError):
-    """Handles the response for the Validation error."""
+    """
+    Handles the response for the Validation error.
+
+    Returns JSONResponse with the error message.
+    """
     return JSONResponse(
         status_code=400,
         content={
@@ -60,7 +68,9 @@ def validation_error_custom(request: Request, exc: RequestValidationError):
 
 @app.get("/")
 def main_root():
-    """Handles the response for the root"""
+    """
+    Handles the response for the root.
+    """
     mapping = {"bruh": True}
     return mapping
 
@@ -68,7 +78,12 @@ def main_root():
 @app.post("/scanner/node_register", status_code=200)
 def post_scanner_node_register8(request: Request,
                                 body: ScannerNodeRegistration):
-    """Handles the regustration of a new node."""
+    """
+    Handles the HTTP-based registration of a new node.
+    Should be called by the scanner node on each launch.
+
+    Should result in node being registered in the database and a token being given to the node, otherwise rejected.
+    """
     authorizationHeader: Union[str, None] = request.headers.get("X-API-Key")
     connectedIP: str = request.client.host
     if authorizationHeader is None:
@@ -117,7 +132,21 @@ def post_scanner_node_register8(request: Request,
 @app.websocket("/scanner/node/{nodeID}")
 async def websocket_endpoint_scanner_node(websocket: WebSocket, nodeID: str,
                                           token: str):
-    """Handles websocket messaging for the scanner node."""
+    """
+    Handles websocket messaging for the scanner node.
+
+    All messages are expected to be sent in JSON format following the structure:
+    ```json
+    {
+        "action": "actionType",
+        "result": {},
+        "error": {
+            "fr": false,
+            "msg": null
+        }
+    }
+    ```
+    """
     try:
         if db.checkScannerNodeToken(
                 nodeID=nodeID, nodeToken=token

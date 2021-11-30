@@ -9,7 +9,11 @@ load_dotenv()
 
 
 def checkEnvironment() -> None:
-    """Checks if there are needed environment variables according to the `typesa.EnvironmentVariablesTypes`."""
+    """
+    Checks if there are needed environment variables according to the `typesa.EnvironmentVariablesTypes`.
+
+    Returns nothing, but raises an exception if there are missing environment variables.
+    """
     try:
         for value in EnvironmentVariablesTypes.__members__.values():
             _ = os.environ[value.name]
@@ -19,23 +23,37 @@ def checkEnvironment() -> None:
 
 
 class Config:
-    """A better getter for environment variables."""
+    """
+    A better getter for environment variables.
+
+    Returns the value of the environment variable with the given name according to the `typesa.EnvironmentVariablesTypes` (+ given `classmethod`s) and pretermined type.
+    """
     @classmethod
     def getMongoDBURI(cls) -> str:
-        """Returns the MongoDB URI."""
+        """
+        Returns the MongoDB URI in string format.
+        """
         return f"mongodb://{os.environ[EnvironmentVariablesTypes.MONGODB_USERNAME.value]}:{os.environ[EnvironmentVariablesTypes.MONGODB_PASSWORD.value]}@{os.environ[EnvironmentVariablesTypes.MONGODB_HOST.value]}:{os.environ[EnvironmentVariablesTypes.MONGODB_PORT.value]}/?authSource={os.environ[EnvironmentVariablesTypes.MONGODB_AUTH_DB.value]}"
 
     @classmethod
     def getMongoDBName(cls) -> str:
-        """Returns the DB name."""
+        """
+        Returns the main DB name in string format.
+        """
         return os.environ[EnvironmentVariablesTypes.MONGODB_DB_NAME.value]
 
     @classmethod
     def getWebserverPort(cls) -> int:
-        """Returns the web server port."""
+        """
+        Returns the web server port in integer format.
+        """
         return int(os.environ[EnvironmentVariablesTypes.WEBSERVER_PORT.value])
 
     @classmethod
     def getMasterKey(cls) -> str:
-        """Returns the master key."""
+        """
+        Returns the master key in string format.
+
+        TODO: Should be protected from the outside world somehow, but IDK how for now (and don't think it's that critical, though).
+        """
         return os.environ[EnvironmentVariablesTypes.MASTER_KEY.value]

@@ -6,7 +6,12 @@ from typesa import ScanerMessageActionTypes
 
 class ScannerNodeProcessing:
     """
-    Handles all the processing received from the node via wevsocket.
+    Handles all the processing received from the node via websocket.
+
+    Args:
+        db: The database class.
+        nodeID (str): The node ID.
+        websocket (WebSocket): The websocket.
     """
 
     def __init__(self, db: DB, nodeID: str, websocket) -> None:
@@ -27,6 +32,10 @@ class ScannerNodeProcessing:
                                    clientSideDisconnect: bool = False) -> None:
         """
         Disconnects gracefully.
+
+        * Removes `hasConnectedToSocket` from the node info.
+        * Removes `isBusy` from the node info.
+        * Unlocks the batch if it hasn't been processed yet.
         """
         if not clientSideDisconnect:
             await self.__ws.close(code=disconnectCode)
@@ -83,7 +92,9 @@ class ScannerNodeProcessing:
         """
         return {
             "action": ScanerMessageActionTypes.SEND_BATCH.value,
-            "result": self.sendBatch(),
+            "result": {
+                "batch": [self.sendBatch()]
+            },
             "error": {
                 "fr": False,
                 "msg": None
@@ -97,7 +108,6 @@ class ScannerNodeProcessing:
         Returns the batch (`dict`), otherwise returns None if there is no batch.
         """
         batch = self.__DB.getOneBatchAndLockIt()
-        print(batch)
         if batch:
             mapping = {
                 "serverIP": batch["server"],
@@ -115,6 +125,8 @@ class ScannerNodeProcessing:
     def sendBatchReject() -> None:
         """
         Notifies the node that the batch request was rejected.
+
+        Returns the message (`dict`) to the node.
         """
         return {
             "action": ScanerMessageActionTypes.SEND_BATCH_REJECT.value,

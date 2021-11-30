@@ -6,10 +6,18 @@ from typesa import APIKeysTypes
 
 
 class DB:
-    """Manages communication with the MongoDB."""
+    """
+    Manages communication with the MongoDB database.
+
+    All methods are not static, they should be called from the main program.
+    """
 
     def __init__(self, mogusURI: str, dbName: str) -> None:
-        """Initializes the DB object."""
+        """
+        Initializes the DB object from the given URI and DB name.
+
+        Stores the collections in the corresponding objects.
+        """
         client = pymongo.MongoClient(mogusURI)
         self.__apikeys = client[dbName]["apikeys"]
         self.__scannernodes = client[dbName]["scannernodes"]
@@ -153,3 +161,5 @@ class DB:
                                        {"$set": {
                                            "status.locked": False
                                        }})
+
+    # TODO: add node session closing
