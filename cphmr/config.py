@@ -1,16 +1,21 @@
+# MARK: - Libraries
 import os
 import sys
 
 from dotenv import load_dotenv
 
-from typesa import EnvironmentVariablesTypes
+from cphmr.typesa import EnvironmentVariablesTypes
 
+
+# MARK: - .env Loader
 load_dotenv()
 
 
+# MARK: - Environment Variables
 def checkEnvironment() -> None:
     """
-    Checks if there are needed environment variables according to the `typesa.EnvironmentVariablesTypes`.
+    Checks if there are needed environment variables according\
+    to the `typesa.EnvironmentVariablesTypes`.
 
     Returns nothing, but raises an exception if there are missing environment variables.
     """
@@ -18,22 +23,31 @@ def checkEnvironment() -> None:
         for value in EnvironmentVariablesTypes.__members__.values():
             _ = os.environ[value.name]
     except KeyError:
-        print("One or more environment variable not set.")
+        print("One or more required environment variables are not set.")
         sys.exit(1)
 
 
+# MARK: - Configurations for environment variables
 class Config:
     """
     A better getter for environment variables.
 
-    Returns the value of the environment variable with the given name according to the `typesa.EnvironmentVariablesTypes` (+ given `classmethod`s) and pretermined type.
+    Returns the value of the environment variable with the given name according\
+    to the `typesa.EnvironmentVariablesTypes` (+ given `classmethod`s) and\
+    pretermined type.
     """
+
     @classmethod
     def getMongoDBURI(cls) -> str:
         """
         Returns the MongoDB URI in string format.
         """
-        return f"mongodb://{os.environ[EnvironmentVariablesTypes.MONGODB_USERNAME.value]}:{os.environ[EnvironmentVariablesTypes.MONGODB_PASSWORD.value]}@{os.environ[EnvironmentVariablesTypes.MONGODB_HOST.value]}:{os.environ[EnvironmentVariablesTypes.MONGODB_PORT.value]}/?authSource={os.environ[EnvironmentVariablesTypes.MONGODB_AUTH_DB.value]}"
+        return f"mongodb://\
+{os.environ[EnvironmentVariablesTypes.MONGODB_USERNAME.value]}:\
+{os.environ[EnvironmentVariablesTypes.MONGODB_PASSWORD.value]}@\
+{os.environ[EnvironmentVariablesTypes.MONGODB_HOST.value]}:\
+{os.environ[EnvironmentVariablesTypes.MONGODB_PORT.value]}/?authSource=\
+{os.environ[EnvironmentVariablesTypes.MONGODB_AUTH_DB.value]}"
 
     @classmethod
     def getMongoDBName(cls) -> str:
@@ -53,7 +67,5 @@ class Config:
     def getMasterKey(cls) -> str:
         """
         Returns the master key in string format.
-
-        TODO: Should be protected from the outside world somehow, but IDK how for now (and don't think it's that critical, though).
         """
         return os.environ[EnvironmentVariablesTypes.MASTER_KEY.value]

@@ -3,7 +3,7 @@
 [![DeepSource](https://deepsource.io/gh/copper-hammer/copperhammer-api.svg/?label=active+issues&show_trend=true&token=4R7tABa0hLEft0oP1VCV4xmj)](https://deepsource.io/gh/copper-hammer/copperhammer-api/?ref=repository-badge)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/6411cdbfd17b49bb8d25355a07ce30ca)](https://www.codacy.com?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copper-hammer/copperhammer-api&amp;utm_campaign=Badge_Grade)
 
-*An extensive API for communicating with CoppenHammer workers and scanners*
+*An extensive API for communicating with CopperHammer workers and scanners*
 
 ## Communication & Models
 
@@ -12,6 +12,8 @@
 Node sends HTTP request to `/{type}/node_register` with its key in the `X-API-Key` header. If the authorization was successful, the server will send an answer containing `nodeID` (conforming to *UUID4*) and a token (128 bits). Since now, the node is expected to connect to `/{type}/node/{nodeID}` via WebSocket with a `token` URL-parameter containing the token.
 
 ### Scanner Node
+
+![Example of a perfect communication chain](https://cdn.vapronva.pw/linkedsources/copperhammer/api-github-rep/images/main-server-and-scanner-node-communication-scheme-ch.jpg)
 
 #### **POST** - /scanner/node_register
 
@@ -67,11 +69,11 @@ Connects to Scanner Node websocket with a give nodeID and token.
 ##### JavaScript Example
 
 ```javascript
-const WebSocket = require('ws')
-var ws = new WebSocket("ws://localhost:8000/scanner/node/nodeID?token=token");
+const WebSocket = require("ws")
+var ws = new WebSocket("ws://localhost:8000/scanner/node/{nodeID}?token={token}");
 
 ws.onopen = function() {
-   ws.send('{"action": "YAGOOD_NODE"}');
+   ws.send('{"action": "YAGOOD_NODE", "result": {"expectMessageBack": true}}');
 };
 
 ws.onmessage = function (evt) {
@@ -95,7 +97,6 @@ ws.onmessage = function (evt) {
 AUTHENTICATE_REQUEST
 AUTHENTICATE_ACCEPT
 AUTHENTICATE_REJECT
-TOKEN_REJECT
 YAGOOD_NODE
 REQUEST_BATCH
 SEND_BATCH
@@ -104,11 +105,7 @@ BATCH_ACCEPT_CONFIRM
 SUBMIT_RESULTS
 RESULTS_ACCEPT_CONFIRM
 RESULTS_REJECT
-OVERALL_ERROR
-MALFORMED_MESSAGE
-NOTENOUGHARGS_ERROR
-UNKNOWN_ACTION_RECEIVED
-UNSUPPORTED_ACTION_RECEIVED
+ERROR
 ```
 
 ##### Message Structure
@@ -122,6 +119,22 @@ UNSUPPORTED_ACTION_RECEIVED
     "msg": null
   }
 }
+```
+
+##### **Available Errors in Socket**
+
+```
+UNK_ER
+WR_BAID
+SN_BR_LOCK
+MAL_MSG
+NO_R_F
+UNK_ACT
+REQ_VAL_ER
+F_K_NOF
+TOK_REJ
+NODE_CON_AL
+NO_RH_XAPK
 ```
 
 ## Environment Variables

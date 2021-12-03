@@ -2,7 +2,7 @@ from typing import Union
 
 import pymongo
 
-from typesa import APIKeysTypes
+from cphmr.typesa import APIKeysTypes
 
 
 class DB:
@@ -97,7 +97,8 @@ class DB:
         Gets the scanner node with the given ID.
 
         It is expected that the node exists in the database.
-        Returns the value of the parameter with the given name if it exists, None otherwise.
+        Returns the value of the parameter with the given name if it exists,\
+        None otherwise.
         """
         try:
             answbp = self.__scannernodes.find_one({"nodeID": nodeID})
@@ -144,7 +145,8 @@ class DB:
         """
         Gets one batch from the database.
 
-        Returns the batch as a dictionary if it exists and is not locked, None otherwise.
+        Returns the batch as a dictionary if it exists and is not locked,\
+            None otherwise.
         """
         return self.__queueservers.find_one_and_update(
             {"status.locked": False}, {"$set": {
@@ -162,4 +164,10 @@ class DB:
                                            "status.locked": False
                                        }})
 
-    # TODO: add node session closing
+    def nodeUnregistration(self, nodeID: str) -> None:
+        """
+        Removes a node from the database.
+
+        The node is identified by its ID.
+        """
+        self.__scannernodes.delete_one({"nodeID": nodeID})

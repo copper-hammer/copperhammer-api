@@ -1,137 +1,95 @@
-import json
-from json.decoder import JSONDecodeError
-from typing import Union
-
-import starlette.websockets
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from config import Config, checkEnvironment
-from db import DB
-from exceptions import ErrorCustomBruhher
-from models import ScannerNodeRegistration
-from processings import ScannerNodeProcessing
-from typesa import APIKeysTypes, ScanerMessageActionTypes
-from utils import generateNewToken, generateUUID, getActionTypeFromString
+# ? Holy sheez, these dependencies are so much fun to manage!
+from cphmr.config import Config, checkEnvironment
+from cphmr.db import DB
+from cphmr.exceptions import ErrorCustomBruhher
+from cphmr.models.response import MainResponseBase
+from cphmr.scanner.exceptions.errors import ErrorBase as ScannerErrorBase
+from cphmr.scanner.models.requests import (
+    AuthenticationRequest as ScannedAuthenticationRequest,
+)
+from cphmr.scanner.models.responses import ResponseBase as ScannerResponseBase
+from cphmr.scanner.processings.authRegister import (
+    AuthenticationRegistration as ScannerAuthenticationRegistration,
+)
+from cphmr.scanner.processings.websocketAuth import (
+    WebSocketAuthentication as ScannerWebSocketAuthentication,
+)
+from cphmr.scanner.processings.wsMessages import (
+    MessageProcessings as ScannerMessageProcessings,
+)
+from cphmr.scanner.typesa import ErrorTypes as ScannerErrorTypes
 
 checkEnvironment()
 
 db = DB(Config.getMongoDBURI(), Config.getMongoDBName())
 
-app = FastAPI(debug=True,
-              title="Copperhammer API",
-              description="API for the CopperHammer")
+app = FastAPI(
+    debug=True, title="Copperhammer API", description="API for the CopperHammer"
+)
 
 
 @app.exception_handler(ErrorCustomBruhher)
-def custom_error_bruhher(request: Request, exc: ErrorCustomBruhher):
+def custom_error_bruhher(request: Request, exc: ErrorCustomBruhher) -> JSONResponse:
     """
     Handles the response for the Custom error.
 
     Returns JSONResponse with the error message.
     """
-    return JSONResponse(
-        status_code=exc.statusCode,
-        content={
-            "action": exc.action,
-            "result": None,
-            "error": {
-                "fr": True,
-                "msg": exc.detail
-            },
-        },
-    )
+    return JSONResponse(status_code=exc.statusCode, content=exc.response.dict())
 
 
 @app.exception_handler(RequestValidationError)
-def validation_error_custom(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(*_) -> JSONResponse:
     """
-    Handles the response for the Validation error.
+    Handles the response for the RequestValidationError.
 
     Returns JSONResponse with the error message.
     """
     return JSONResponse(
         status_code=400,
-        content={
-            "action": "REQUEST_VALIDATION_ERROR",
-            "result": None,
-            "error": {
-                "fr":
-                True,
-                "msg":
-                "RVER - Not enough arguments or the structure were encountered in the body",
-            },
-        },
+        content=MainResponseBase(
+            error=ScannerErrorBase(
+                name=ScannerErrorTypes.REQ_VAL_ER,
+                description="Requset validation error.",
+            )
+        ).dict(),
     )
 
 
-@app.get("/")
-def main_root():
-    """
-    Handles the response for the root.
-    """
-    mapping = {"bruh": True}
-    return mapping
-
-
-@app.post("/scanner/node_register", status_code=200)
-def post_scanner_node_register8(request: Request,
-                                body: ScannerNodeRegistration):
+@app.post("/scanner/node_register", status_code=200, response_model=ScannerResponseBase)
+def post_scanner_node_register(request: Request, body: ScannedAuthenticationRequest):
     """
     Handles the HTTP-based registration of a new node.
     Should be called by the scanner node on each launch.
 
-    Should result in node being registered in the database and a token being given to the node, otherwise rejected.
+    Should result in node being registered in the database and a token being\
+    given to the node, otherwise rejected.
     """
-    authorizationHeader: Union[str, None] = request.headers.get("X-API-Key")
-    connectedIP: str = request.client.host
-    if authorizationHeader is None:
-        raise ErrorCustomBruhher(
-            action=ScanerMessageActionTypes.AUTHENTICATE_REJECT.value,
-            statusCode=401,
-            detail="NO_AUH - No authorization header",
-        )
-    if body.action != ScanerMessageActionTypes.AUTHENTICATE_REQUEST.value:
-        raise ErrorCustomBruhher(
-            action=ScanerMessageActionTypes.UNSUPPORTED_ACTION_RECEIVED.value,
-            statusCode=400,
-            detail="IN_ACR - Unsupported action received",
-        )
-    if db.checkKey(authorizationHeader,
-                   APIKeysTypes.SCANNER_NODE_REGISTRATION):
-        nodeID = generateUUID()
-        nodeToken = generateNewToken()
-        db.addScannerNode(nodeID=nodeID,
-                          nodeToken=nodeToken,
-                          connectedIP=connectedIP)
-        mapping = {
-            "action": ScanerMessageActionTypes.AUTHENTICATE_ACCEPT.value,
-            "result": {
-                "authorization": {
-                    "success": True
-                },
-                "nodeInfo": {
-                    "nodeID": nodeID,
-                    "nodeToken": nodeToken
-                },
-            },
-            "error": {
-                "fr": False,
-                "msg": None
-            },
-        }
-        return mapping
-    raise ErrorCustomBruhher(
-        action=ScanerMessageActionTypes.AUTHENTICATE_REJECT.value,
-        statusCode=401,
-        detail="F_K_NOF - No such authorization key with the corresponding type found",
-    )
+    if ScannerAuthenticationRegistration.checkRequestParameters(
+        request, body
+    ) and ScannerAuthenticationRegistration.checkForValidKeys(request, db):
+        return ScannerAuthenticationRegistration.registerNode(request, db)
+    # ? Well, this return isn't necessar since everything will be caught in
+    # ? exceptions... but I'm not sure if it's a good idea to do like that in
+    # ? in the first place (but DeepSource says yes, soooo). I'll leave it
+    # ? here for now.
+    return None
+
+
+# ? Is it even necessary to "unregister" a node? I don't think so.
+# TODO: Scanner node unregistration `/scanner/node_unregister`
 
 
 @app.websocket("/scanner/node/{nodeID}")
-async def websocket_endpoint_scanner_node(websocket: WebSocket, nodeID: str,
-                                          token: str):
+async def websocket_endpoint_scanner_node(
+    websocket: WebSocket, nodeID: str, token: str
+):
     """
     Handles websocket messaging for the scanner node.
 
@@ -140,79 +98,33 @@ async def websocket_endpoint_scanner_node(websocket: WebSocket, nodeID: str,
     {
         "action": "actionType",
         "result": {},
-        "error": {
-            "fr": false,
-            "msg": null
-        }
+        "error": null
     }
     ```
     """
-    try:
-        if db.checkScannerNodeToken(
-                nodeID=nodeID, nodeToken=token
-        ) and not (db.getScannerNodeParameter(
-                nodeID=nodeID,
-                parameterString="info.status.hasConnectedToSocket") is True):
-            try:
-                await websocket.accept()
-                SCNOPR = ScannerNodeProcessing(db,
-                                               nodeID=nodeID,
-                                               websocket=websocket)
-                while True:
-                    data = await websocket.receive_text()
-                    try:
-                        data = json.loads(data)
-                        await SCNOPR.processMessage(
-                            message=data,
-                            actionType=getActionTypeFromString(data["action"]),
-                        )
-                    except JSONDecodeError:
-                        mapping = {
-                            "action":
-                            ScanerMessageActionTypes.MALFORMED_MESSAGE.value,
-                            "result": None,
-                            "error": {
-                                "fr":
-                                True,
-                                "msg":
-                                "MALMJS - Received message is not a valid json",
-                            },
-                        }
-                        await websocket.send_json(mapping)
-                        await SCNOPR.gracefullyDisconnect(1002)
-                    except KeyError:
-                        mapping = {
-                            "action":
-                            ScanerMessageActionTypes.NOTENOUGHARGS_ERROR.value,
-                            "result":
-                            None,
-                            "error": {
-                                "fr":
-                                True,
-                                "msg":
-                                "NOEARE - In the received json some field were not found",
-                            },
-                        }
-                        await websocket.send_json(mapping)
-                        await SCNOPR.gracefullyDisconnect(1002)
-            except starlette.websockets.WebSocketDisconnect:
-                await SCNOPR.gracefullyDisconnect(1000,
-                                                  clientSideDisconnect=True)
-        mapping = {
-            "action": ScanerMessageActionTypes.TOKEN_REJECT.value,
-            "result": None,
-            "error": {
-                "fr":
-                True,
-                "msg":
-                "TOREJ - Token was either rejected, does not belong to this node or this node is already connected",
-            },
-        }
-        await websocket.accept()
-        await websocket.send_json(mapping)
+    await websocket.accept()
+    authStatus = ScannerWebSocketAuthentication.checkByNodeID(
+        nodeID=nodeID, nodeToken=token, db=db
+    )
+    # ? This is cringe, I think. But I don't know how to do it better.
+    if authStatus == 1:
+        # ScannerWebSocketAuthentication.setNodeConnected(nodeID=nodeID, db=db)
+        SCNOPR = ScannerMessageProcessings(websocket=websocket, db=db)
+        try:
+            while True:
+                SCNOPR.processMessage(await websocket.receive_text())
+        except WebSocketDisconnect:
+            ScannerWebSocketAuthentication.setNodeConnected(
+                nodeID=nodeID, db=db, disconnect=True
+            )
+        except AssertionError:
+            ScannerWebSocketAuthentication.setNodeConnected(
+                nodeID=nodeID, db=db, disconnect=True
+            )
+    else:
+        await websocket.send_json(
+            ScannerWebSocketAuthentication.getNegativeResponse(
+                False if authStatus == -1 else True  # skipcq: PYL-R1719
+            ).dict()
+        )
         await websocket.close(code=1008)
-    except starlette.websockets.WebSocketDisconnect:
-        pass
-    # TODO: Need to understand why sometimes `AssertionError` can be raised by `starlette` when closing websocket (server-side).
-    except AssertionError:
-        pass
